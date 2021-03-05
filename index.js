@@ -1,12 +1,16 @@
 ;(function() {
   var PageController = function() {
     var canvas,
+      previewCanvas,
       cell_height,
       cell_width,
       map = {},
+      nextCubeItem,
+      nextCubetype,
       timer,
       shouldStop = false,
-      gaming = false
+      gaming = false,
+      score = 0
     var emptyCell = {
       x: 0,
       y: 0,
@@ -18,6 +22,7 @@
     }
     var set = {
       canvasSeletor: "#canvas",
+      previewCanvasSeletor: "#preview-canvas",
       grid_cols: 12,
       grid_rows: 20,
       lineWidth: 1,
@@ -204,6 +209,7 @@
         fillOneRect(map[key].x, map[key].y, map[key].color)
       })
     }
+
     var showGameOver = function() {
       $("#game-over").show()
     }
@@ -319,12 +325,22 @@
     var getTeris = function(x, y) {
       var cubeType = "cube" + (Math.floor(Object.keys(CUBE_INFO).length * Math.random()) + 1)
       var cubeItem = CUBE_INFO[cubeType]
+
+      if (!nextCubeItem) {
+        nextCubeItem = cubeItem
+        nextCubetype = cubeType
+        cubeType = "cube" + (Math.floor(Object.keys(CUBE_INFO).length * Math.random()) + 1)
+        cubeItem = CUBE_INFO[cubeType]
+      }
       var groupId = "group" + new Date().getTime()
-      console.warn("cubeItem", cubeItem)
-      if (checkValidCube(x, y, cubeItem.bodyArray(ROTATION_TYPE.TYPE1))) {
-        cubeItem.bodyArray(ROTATION_TYPE.TYPE1).forEach(obj => {
-          addMapCell(x, y, x + obj.x, y + obj.y, groupId, cubeItem.color, cubeType, ROTATION_TYPE.TYPE1)
+      console.warn("cubeItem", nextCubeItem)
+      if (checkValidCube(x, y, nextCubeItem.bodyArray(ROTATION_TYPE.TYPE1))) {
+        nextCubeItem.bodyArray(ROTATION_TYPE.TYPE1).forEach(obj => {
+          addMapCell(x, y, x + obj.x, y + obj.y, groupId, nextCubeItem.color, nextCubetype, ROTATION_TYPE.TYPE1)
         })
+        drawPreviewCube(cubeItem)
+        nextCubeItem = cubeItem
+        nextCubetype = cubeType
       } else {
         gaming = false
       }
@@ -356,6 +372,7 @@
     }
     var initData = function() {
       canvas = $(set.canvasSeletor).get(0)
+      previewCanvas = $(set.previewCanvasSeletor).get(0)
       cell_height = canvas.height / set.grid_rows
       cell_width = canvas.width / set.grid_cols
     }
@@ -409,38 +426,63 @@
           timeController()
         }
       })
+      $("#restart").click(function() {
+        $("#game-over").hide()
+        stop()
+        shouldStop = false
+        gaming = true
+        map = {}
+        score = 0
+        timeController()
+      })
     }
-    var drawGridView = function() {
-      var ctx = canvas.getContext("2d")
+    var drawGridView = function(c, pcol, prow) {
+      var dcanvas = c ? c : canvas
+      var cols = pcol ? pcol : set.grid_cols
+      var rows = prow ? prow : set.grid_rows
+      var ctx = dcanvas.getContext("2d")
       var gradient = ctx.createLinearGradient(0, 0, 0, 300)
       gradient.addColorStop(0, "#e0e0e0")
       gradient.addColorStop(1, "#ffffff")
       ctx.fillStyle = gradient
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillRect(0, 0, dcanvas.width, dcanvas.height)
       ctx.lineWidth = set.lineWidth
       ctx.strokeStyle = set.ctxStrokeStyle
       //   結束邉框描繪
       ctx.beginPath()
 
-      for (var col = 0; col < set.grid_cols; col++) {
-        var x = col * cell_width
+      for (var col = 0; col < cols; col++) {
+        var x = (col * dcanvas.width) / cols
         ctx.moveTo(x, 0)
-        ctx.lineTo(x, canvas.height)
+        ctx.lineTo(x, dcanvas.height)
       }
-      for (var row = 0; row < set.grid_rows; row++) {
-        var y = row * cell_height
+      for (var row = 0; row < rows; row++) {
+        var y = (row * dcanvas.height) / rows
         ctx.moveTo(0, y)
-        ctx.lineTo(canvas.width, y)
+        ctx.lineTo(dcanvas.width, y)
       }
       ctx.stroke()
     }
-    var fillOneRect = function(ox, oy, color) {
-      var ctx = canvas.getContext("2d")
-      var rect = getRectPosition(ox, oy)
+    var fillOneRect = function(ox, oy, color, c, pcol, prow) {
+      var dcanvas = c ? c : canvas
+      var cols = pcol ? pcol : set.grid_cols
+      var rows = prow ? prow : set.grid_rows
+      var cell_width = dcanvas.width / cols
+      var cell_height = dcanvas.height / rows
+      var ctx = dcanvas.getContext("2d")
+      var rect = getRectPosition(ox, oy, cell_width, cell_height)
       ctx.fillStyle = color
       ctx.fillRect(rect.ox, rect.oy, cell_width, cell_height)
     }
-    var getRectPosition = function(x, y) {
+    var drawPreviewCube = function(cubeItem) {
+      console.warn("drawPreviewCube", cubeItem)
+      drawGridView(previewCanvas, 4, 4)
+      cubeItem.bodyArray(ROTATION_TYPE.TYPE1).forEach(obj => {
+        fillOneRect(obj.x + 1, obj.y, cubeItem.color, previewCanvas, 4, 4)
+      })
+    }
+
+    var getRectPosition = function(x, y, cell_width, cell_height) {
       var ox = x * cell_width
       var oy = y * cell_height
       var RightBottomX = (x + 1) * cell_width
@@ -468,6 +510,7 @@
         if (line[l].length == set.grid_cols) {
           console.warn("line full!!!!!!!!", l)
           clearLine(l)
+          addScore()
           moveDown(l)
         }
       })
@@ -486,6 +529,10 @@
           map[key].groupY++
         }
       })
+    }
+    var addScore = function() {
+      score += 10
+      $("#score-number").text(score)
     }
   }
   var pageController = new PageController()
