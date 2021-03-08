@@ -1,3 +1,4 @@
+[點擊查看Demo(github-page)](https://s956142.github.io/tetris-battle/ "俄羅斯方塊")
 # tetris-battle
 
 # canvas-demo
